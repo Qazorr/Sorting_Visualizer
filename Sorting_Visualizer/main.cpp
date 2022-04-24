@@ -5,6 +5,6 @@
 
 int main()
 {
-	Visualizer visualizer(5);
+	Visualizer visualizer(50);
 	visualizer.main_loop();
 }

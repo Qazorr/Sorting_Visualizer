@@ -8,6 +8,8 @@ class Visualizer
 		sf::RenderWindow window;
 		std::string name = "SFML WORKS";
 		sf::Font font;
+		sf::SoundBuffer buffer;
+		sf::Sound sound;
 		unsigned int samples;
 		std::vector<data_t> data{};
 		void init();
@@ -15,6 +17,8 @@ class Visualizer
 		void highlight(data_t &a, data_t &b);
 		void dehighlight(data_t& a, data_t& b);
 		void swap(data_t& a, data_t& b);
+		void inplacemerge(int start, int end);
+		void finish_highlight();
 	public:
 		Visualizer();
 		Visualizer(unsigned int samples);
@@ -24,6 +28,7 @@ class Visualizer
 		void bubble();
 		void selection();
 		void insertion();
+		void merge(int start, int end);
 		void main_loop();
 };
 

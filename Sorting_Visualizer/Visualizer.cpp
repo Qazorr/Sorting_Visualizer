@@ -9,6 +9,11 @@ void Visualizer::init()
         std::cerr << "FONT ERROR" << std::endl;
         exit(-1);
     }
+    if (!buffer.loadFromFile("sound.wav"))
+    {
+        std::cerr << "SOUNDBUFFER ERROR" << std::endl;
+        exit(-1);
+    }
 }
 
 void Visualizer::highlight(data_t& a, data_t& b)
@@ -25,12 +30,16 @@ void Visualizer::dehighlight(data_t& a, data_t& b)
 
 void Visualizer::swap(data_t& a, data_t& b)
 {
+    this->sound.setBuffer(buffer);
+    this->sound.setVolume(20.f);
+
     this->window.clear(BACKGROUND);
     this->highlight(a, b);
     this->visualize_data();
     std::swap(a, b);
-    std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME));
-
+    //sound.play();
+    sleep();
+    //sound.stop();
     this->window.clear(BACKGROUND);
     this->highlight(a, b);
     this->visualize_data();
@@ -68,10 +77,25 @@ Visualizer::Visualizer(std::initializer_list<int> values)
     }
 }
 
+void Visualizer::inplacemerge(int start, int end)
+{
+    int gap = end - start + 1;
+    auto nextGap = [](int gap) { return gap <= 1 ? 0 : (int)std::ceil(gap / 2.0); };
+    for (gap = nextGap(gap); gap > 0; gap = nextGap(gap))
+    {
+        for (int i = start; i + gap <= end; i++)
+        {
+            int j = i + gap;
+            if (this->data[i] > this->data[j])
+                this->swap(this->data[i], this->data[j]);
+        }
+    }
+}
+
 void Visualizer::generate_data()
 {
     data_t temp;
-    float data_width = static_cast<float>(WINDOW_WIDTH) / this->samples;
+    float data_width = static_cast<float>(SORT_WINDOW_WIDTH) / this->samples;
     this->data.clear();
     for (unsigned i = 0; i < this->samples; i++) {
         temp.value = (rand() % (WINDOW_HEIGHT - 10)) + 10;
@@ -87,10 +111,23 @@ void Visualizer::generate_data()
     }
 }
 
+void Visualizer::finish_highlight()
+{
+    for (auto& d : data) {
+        d.rect.setFillColor(FINISH_COLOR);
+        this->visualize_data();
+        sleep();
+    }
+    sleep();
+    for (auto& d : data) 
+        d.rect.setFillColor(DATA_COLOR);
+
+}
+
 void Visualizer::visualize_data()
 {
     unsigned int index = 0;
-    float data_width = (float)WINDOW_WIDTH / (float)this->samples;
+    float data_width = (float)SORT_WINDOW_WIDTH / (float)this->samples;
     sf::RectangleShape rect;
     this->window.clear(BACKGROUND);
     for (auto& val : this->data) {
@@ -112,6 +149,7 @@ void Visualizer::bubble()
             }
             operations++;
             show_progress(operations, operations_expected);
+            sound.setPitch(1 + std::ceil((100 * (float)operations) / (float)operations_expected) / 200);
         }
     }
     std::cout << "BUBBLE ENDED\n";
@@ -133,6 +171,7 @@ void Visualizer::selection()
         this->swap(data[i], data[min_index]);
         operations++;
         show_progress(operations, operations_expected);
+        sound.setPitch(0.5 + std::ceil((100 * (float)operations) / (float)operations_expected) / 200);
         min_value = data[i + 1].value;
     }
     std::cout << "SELECTION ENDED\n";
@@ -149,9 +188,23 @@ void Visualizer::insertion()
             j--;
             operations++;
             show_progress(operations, operations_expected);
+            sound.setPitch(0.5 + std::ceil((100 * (float)operations) / (float)operations_expected) / 200);
         }
     }
     std::cout << "INSERTION ENDED\n";
+}
+
+void Visualizer::merge(int start, int end)
+{
+    if (start == end)
+        return;
+
+    int mid = (start + end) / 2;
+
+    merge(start, mid);
+    merge(mid + 1, end);
+
+    inplacemerge(start, end);
 }
 
 void Visualizer::main_loop()
@@ -170,10 +223,24 @@ void Visualizer::main_loop()
                     switch (event.key.code)
                     {
                         case sf::Keyboard::Escape: this->window.close(); break;
-                        case sf::Keyboard::A: this->bubble(); break;
-                        case sf::Keyboard::S: this->selection(); break;
-                        case sf::Keyboard::D: this->insertion(); break;
+                        case sf::Keyboard::A: this->bubble(); finish_highlight(); break;
+                        case sf::Keyboard::S: this->selection(); finish_highlight(); break;
+                        case sf::Keyboard::D: this->insertion(); finish_highlight(); break;
+                        case sf::Keyboard::F: this->merge(0, this->samples-1); finish_highlight(); break;
                         case sf::Keyboard::R: this->generate_data(); break;
+                        case sf::Keyboard::T: 
+                            for (int i = 0; i < 4; i++) {
+                                this->generate_data();
+                                switch (i)
+                                {
+                                case 0: this->bubble(); break;
+                                case 1: this->selection(); break;
+                                case 2: this->insertion(); break;
+                                case 3: this->merge(0, this->samples - 1); break;
+                                }
+                                this->finish_highlight();
+                            }
+                            break;
                     }
                     break;
                 default:
@@ -183,4 +250,3 @@ void Visualizer::main_loop()
         this->visualize_data();
     }
 }
-

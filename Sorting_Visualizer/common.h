@@ -8,15 +8,21 @@
 #include <thread>
 #include <chrono>
 
-constexpr auto WINDOW_WIDTH = 800;
+constexpr auto WINDOW_WIDTH = 1000;
 constexpr auto WINDOW_HEIGHT = 600;
+constexpr auto MENU_WIDTH = 200;
+constexpr auto SORT_WINDOW_WIDTH = WINDOW_WIDTH - MENU_WIDTH;
 constexpr auto OUTLINE_THICKNESS = 0.75f;
-constexpr auto SLEEP_TIME = 10;
+constexpr auto SLEEP_TIME = 1;
 
 #define BACKGROUND sf::Color::White
 #define HIGHLIGHT_COLOR1 sf::Color::Blue
 #define HIGHLIGHT_COLOR2 sf::Color::Magenta
 #define DATA_COLOR sf::Color::Yellow
+#define FINISH_COLOR sf::Color::Green
+
+#define sleep() std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME))
+
 
 struct data_t {
 	int value = -1;
