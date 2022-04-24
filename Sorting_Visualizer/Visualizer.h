@@ -12,12 +12,14 @@ class Visualizer
 		sf::Sound sound;
 		unsigned int samples;
 		std::vector<data_t> data{};
+		counter operations;
 		void init();
 		//change these 2 to varargs
 		void highlight(data_t &a, data_t &b);
 		void dehighlight(data_t& a, data_t& b);
 		void swap(data_t& a, data_t& b);
 		void inplacemerge(int start, int end);
+		void progress_bar();
 		void finish_highlight();
 	public:
 		Visualizer();

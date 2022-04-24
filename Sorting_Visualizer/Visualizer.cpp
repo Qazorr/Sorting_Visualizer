@@ -77,35 +77,20 @@ Visualizer::Visualizer(std::initializer_list<int> values)
     }
 }
 
-void Visualizer::inplacemerge(int start, int end)
-{
-    int gap = end - start + 1;
-    auto nextGap = [](int gap) { return gap <= 1 ? 0 : (int)std::ceil(gap / 2.0); };
-    for (gap = nextGap(gap); gap > 0; gap = nextGap(gap))
-    {
-        for (int i = start; i + gap <= end; i++)
-        {
-            int j = i + gap;
-            if (this->data[i] > this->data[j])
-                this->swap(this->data[i], this->data[j]);
-        }
-    }
-}
-
 void Visualizer::generate_data()
 {
     data_t temp;
     float data_width = static_cast<float>(SORT_WINDOW_WIDTH) / this->samples;
     this->data.clear();
     for (unsigned i = 0; i < this->samples; i++) {
-        temp.value = (rand() % (WINDOW_HEIGHT - 10)) + 10;
+        temp.value = (rand() % (SORT_WINDOW_HEIGHT - 10)) + 10;
         temp.rect.setSize(sf::Vector2f(data_width - 2.f * OUTLINE_THICKNESS, -temp.value));
         temp.rect.setFillColor(DATA_COLOR);
         temp.rect.setOutlineThickness(OUTLINE_THICKNESS);
         temp.rect.setOutlineColor(sf::Color::Black);
         temp.rect.setPosition(sf::Vector2f(
             i * data_width,
-            WINDOW_HEIGHT
+            SORT_WINDOW_HEIGHT
         ));
         data.push_back(temp);
     }
@@ -134,22 +119,33 @@ void Visualizer::visualize_data()
         this->window.draw(val.rect);
         index++;
     }
+    this->progress_bar();
     this->window.display();
+}
+
+void Visualizer::progress_bar()
+{
+    int current = int(std::ceil(
+        (100 * (float)(*operations)) / (float)operations.expected));
+    sf::RectangleShape bar(sf::Vector2f(current * SORT_WINDOW_WIDTH/100, -PROGRESS_HEIGHT));
+    bar.setPosition(0, WINDOW_HEIGHT);
+    bar.setFillColor(PROGRESS_BAR_COLOR);
+    bar.setOutlineThickness(1.f);
+    this->window.draw(bar);
 }
 
 void Visualizer::bubble()
 {
-    unsigned int operations = 0, operations_expected = bubble_counter(this->data);
+    this->operations = bubble_counter(this->data);
     std::cout << "BUBBLE STARTED\n";
     for (int i = 0; i < data.size() - 1; i++) {
         for (int j = 0; j < data.size() - i - 1; j++) {
             if (data[j] > data[j + 1]) {
                 this->swap(data[j], data[j + 1]);
-                operations++;
+                this->operations.swap();
             }
-            operations++;
-            show_progress(operations, operations_expected);
-            sound.setPitch(1 + std::ceil((100 * (float)operations) / (float)operations_expected) / 200);
+            this->operations.comp();
+            show_progress(operations);
         }
     }
     std::cout << "BUBBLE ENDED\n";
@@ -157,7 +153,8 @@ void Visualizer::bubble()
 
 void Visualizer::selection()
 {
-    unsigned int operations = 0, min_index = 0, operations_expected = selection_counter(this->data);
+    unsigned int min_index = 0;
+    this->operations = selection_counter(this->data);
     int min_value = data[0].value;
     std::cout << "SELECTION STARTED\n";
     for (int i = 0; i < data.size() - 1; i++) {
@@ -166,12 +163,11 @@ void Visualizer::selection()
                 min_value = data[j].value;
                 min_index = j;
             }
-            operations++;
+            this->operations.comp();
         }
         this->swap(data[i], data[min_index]);
-        operations++;
-        show_progress(operations, operations_expected);
-        sound.setPitch(0.5 + std::ceil((100 * (float)operations) / (float)operations_expected) / 200);
+        this->operations.swap();
+        show_progress(this->operations);
         min_value = data[i + 1].value;
     }
     std::cout << "SELECTION ENDED\n";
@@ -179,19 +175,36 @@ void Visualizer::selection()
 
 void Visualizer::insertion()
 {
-    unsigned int operations = 0, operations_expected = insertion_counter(this->data);
+    this->operations = insertion_counter(this->data);
     std::cout << "INSERTION STARTED\n";
     for (int i = 0; i < this->data.size(); i++) {
         int j = i;
         while ((j > 0) && (data[j - 1] > data[j])) {
             this->swap(data[j - 1], data[j]);
             j--;
-            operations++;
-            show_progress(operations, operations_expected);
-            sound.setPitch(0.5 + std::ceil((100 * (float)operations) / (float)operations_expected) / 200);
+            this->operations.swap();
+            show_progress(this->operations);
         }
     }
     std::cout << "INSERTION ENDED\n";
+}
+
+void Visualizer::inplacemerge(int start, int end)
+{
+    int gap = end - start + 1;
+    auto nextGap = [](int gap) { return gap <= 1 ? 0 : (int)std::ceil(gap / 2.0); };
+    for (gap = nextGap(gap); gap > 0; gap = nextGap(gap))
+    {
+        for (int i = start; i + gap <= end; i++)
+        {
+            int j = i + gap;
+            if (this->data[i] > this->data[j]) {
+                this->swap(this->data[i], this->data[j]);
+                this->operations.swap();
+            }
+            this->operations.comp();
+        }
+    }
 }
 
 void Visualizer::merge(int start, int end)
@@ -209,6 +222,7 @@ void Visualizer::merge(int start, int end)
 
 void Visualizer::main_loop()
 {
+    std::vector<data_t> copy;
     while (this->window.isOpen())
     {
         sf::Event event;
@@ -226,7 +240,14 @@ void Visualizer::main_loop()
                         case sf::Keyboard::A: this->bubble(); finish_highlight(); break;
                         case sf::Keyboard::S: this->selection(); finish_highlight(); break;
                         case sf::Keyboard::D: this->insertion(); finish_highlight(); break;
-                        case sf::Keyboard::F: this->merge(0, this->samples-1); finish_highlight(); break;
+                        case sf::Keyboard::F: 
+                            this->operations.full_reset();
+                            copy = this->data;
+                            merge_counter(copy, this->operations, 0, this->samples-1); 
+                            this->operations.combine();
+                            this->merge(0, this->samples - 1);
+                            finish_highlight();
+                            break;
                         case sf::Keyboard::R: this->generate_data(); break;
                         case sf::Keyboard::T: 
                             for (int i = 0; i < 4; i++) {
@@ -236,7 +257,13 @@ void Visualizer::main_loop()
                                 case 0: this->bubble(); break;
                                 case 1: this->selection(); break;
                                 case 2: this->insertion(); break;
-                                case 3: this->merge(0, this->samples - 1); break;
+                                case 3: 
+                                    this->operations.full_reset();
+                                    copy = this->data;
+                                    merge_counter(copy, this->operations, 0, this->samples - 1);
+                                    this->operations.combine();
+                                    this->merge(0, this->samples - 1); 
+                                    break;
                                 }
                                 this->finish_highlight();
                             }
