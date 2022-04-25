@@ -8,6 +8,8 @@
 #include <thread>
 #include <chrono>
 
+constexpr auto SAMPLES = 50;
+
 constexpr auto WINDOW_WIDTH = 1200;
 constexpr auto WINDOW_HEIGHT = 600;
 constexpr auto MENU_WIDTH = 200;
@@ -16,10 +18,15 @@ constexpr auto SORT_WINDOW_WIDTH = WINDOW_WIDTH - MENU_WIDTH;
 constexpr auto SORT_WINDOW_HEIGHT = WINDOW_HEIGHT - PROGRESS_HEIGHT;
 constexpr auto OUTLINE_THICKNESS = 0.75f;
 constexpr auto SLEEP_TIME = 0;
+constexpr auto BTN_OFFSET = 25;
+constexpr auto BTN_HEIGHT = 50;
+
+constexpr auto FONT_NAME_1 = "arial.ttf";
+constexpr auto FONT_NAME_2 = "JetBrainsMono-Medium.ttf";
 
 #define BACKGROUND sf::Color(128, 128, 128)
-#define HIGHLIGHT_COLOR1 sf::Color::Blue
-#define HIGHLIGHT_COLOR2 sf::Color::Magenta
+#define HIGHLIGHT_COLOR1 sf::Color::Green
+#define HIGHLIGHT_COLOR2 sf::Color::Red
 #define DATA_COLOR sf::Color::Yellow
 #define FINISH_COLOR sf::Color::Green
 #define PROGRESS_BAR_COLOR sf::Color(0, 100, 0)
@@ -70,6 +77,17 @@ struct counter {
 	friend std::ostream& operator<<(std::ostream& os, const counter& c) { os << c.comparison + c.swaps; return os; }
 };
 
+enum sorts {
+	bubble,
+	selection,
+	insertion,
+	merge,
+	heap,
+	COUNT = heap
+};
+
+std::string get_name(int sort);
+
 void swap(data_t& a, data_t& b);
 
 [[nodiscard("Only purpouse is to get the number of operations")]] 
@@ -84,5 +102,10 @@ counter& insertion_counter(std::vector<data_t> data);
 void inplacemerge_counter(std::vector<data_t> &data, counter& operations, int start, int end);
 
 void merge_counter(std::vector<data_t> &data, counter &operations, int start, int end);
+
+void heapify_counter(std::vector<data_t>& data, counter& ops, int n, int i);
+
+[[nodiscard("Only purpouse is to get the number of operations")]]
+counter& heap_counter(std::vector<data_t>& data);
 
 void show_progress(counter &operations);

@@ -4,6 +4,7 @@ void Visualizer::init()
 {
     srand(time(NULL));
     this->window.create(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), this->name);
+    this->window.setFramerateLimit(60);
     if (!this->font.loadFromFile("arial.ttf"))
     {
         std::cerr << "FONT ERROR" << std::endl;
@@ -14,6 +15,9 @@ void Visualizer::init()
         std::cerr << "SOUNDBUFFER ERROR" << std::endl;
         exit(-1);
     }
+    std::cout << "\033[31m[VISUALIZER]\033[0m \033[33mWINDOW INITIALIZED\033[0m\n";
+    std::cout << "\033[31m[VISUALIZER]\033[0m \033[33mFONT INITIALIZED\033[0m\n";
+    std::cout << "\033[31m[VISUALIZER]\033[0m \033[33mSOUND INITIALIZED\033[0m\n";
 }
 
 void Visualizer::highlight(data_t& a, data_t& b)
@@ -33,9 +37,6 @@ void Visualizer::swap(data_t& a, data_t& b)
     this->sound.setBuffer(buffer);
     this->sound.setVolume(20.f);
 
-    this->window.clear(BACKGROUND);
-    this->highlight(a, b);
-    this->visualize_data();
     std::swap(a, b);
     //sound.play();
     sleep();
@@ -94,6 +95,13 @@ void Visualizer::generate_data()
         ));
         data.push_back(temp);
     }
+    std::cout << "\033[31m[VISUALIZER]\033[0m \033[32mDATA GENERATED\033[0m\n";
+}
+
+void Visualizer::shuffle_data()
+{
+    std::random_shuffle(data.begin(), data.end());
+    std::cout << "\033[31m[VISUALIZER]\033[0m \033[32mDATA SHUFFLED\033[0m\n";
 }
 
 void Visualizer::finish_highlight()
@@ -106,20 +114,21 @@ void Visualizer::finish_highlight()
     sleep();
     for (auto& d : data) 
         d.rect.setFillColor(DATA_COLOR);
-
+    std::cout << "\033[31m[VISUALIZER]\033[0m \033[32mSORTED DATA HIGHLIGHTED\033[0m\n";
 }
 
 void Visualizer::visualize_data()
 {
     unsigned int index = 0;
     float data_width = (float)SORT_WINDOW_WIDTH / (float)this->samples;
-    sf::RectangleShape rect;
     this->window.clear(BACKGROUND);
+    this->menu.render(this->window);
+    this->progress_bar();
     for (auto& val : this->data) {
         this->window.draw(val.rect);
         index++;
     }
-    this->progress_bar();
+
     this->window.display();
 }
 
@@ -127,24 +136,33 @@ void Visualizer::progress_bar()
 {
     int current = int(std::ceil(
         (100 * (float)(*operations)) / (float)operations.expected));
-    sf::RectangleShape bar(sf::Vector2f(current * SORT_WINDOW_WIDTH/100, -PROGRESS_HEIGHT));
+    sf::RectangleShape bar(sf::Vector2f(current * (SORT_WINDOW_WIDTH-2*OUTLINE_THICKNESS)/100, -PROGRESS_HEIGHT));
     bar.setPosition(0, WINDOW_HEIGHT);
     bar.setFillColor(PROGRESS_BAR_COLOR);
-    bar.setOutlineThickness(1.f);
+    bar.setOutlineColor(sf::Color::Black);
+    bar.setOutlineThickness(OUTLINE_THICKNESS);
     this->window.draw(bar);
 }
 
 void Visualizer::bubble()
 {
+    bool skip = false;
+    short step = 0, skip_step = static_cast<short>(std::ceil(data.size()/25.f));
     this->operations = bubble_counter(this->data);
     std::cout << "BUBBLE STARTED\n";
     for (int i = 0; i < data.size() - 1; i++) {
         for (int j = 0; j < data.size() - i - 1; j++) {
             if (data[j] > data[j + 1]) {
-                this->swap(data[j], data[j + 1]);
+                if (skip) {
+                    this->swap(data[j], data[j + 1]);
+                    skip = false;
+                }
+                else std::swap(data[j], data[j + 1]);
                 this->operations.swap();
             }
             this->operations.comp();
+            step = (step + 1) % skip_step;
+            if (!step) skip = true;
             show_progress(operations);
         }
     }
@@ -176,12 +194,22 @@ void Visualizer::selection()
 void Visualizer::insertion()
 {
     this->operations = insertion_counter(this->data);
+    bool skip = false;
+    short step = 0, skip_step = static_cast<short>(std::ceil(data.size() / 25.f));
     std::cout << "INSERTION STARTED\n";
     for (int i = 0; i < this->data.size(); i++) {
         int j = i;
         while ((j > 0) && (data[j - 1] > data[j])) {
-            this->swap(data[j - 1], data[j]);
+            if (skip) {
+                this->swap(data[j-1], data[j]);
+                skip = false;
+            }
+            else {
+                std::swap(data[j - 1], data[j]);
+            }
             j--;
+            step = (step + 1) % skip_step;
+            if (!step) skip = true;
             this->operations.swap();
             show_progress(this->operations);
         }
@@ -220,6 +248,38 @@ void Visualizer::merge(int start, int end)
     inplacemerge(start, end);
 }
 
+void Visualizer::heapify(int n, int i)
+{
+    int largest = i, left = 2 * i + 1, right = 2 * i + 2; 
+
+    if (left < n && data[left] > data[largest])
+        largest = left;
+    this->operations.comp();
+
+    if (right < n && data[right] > data[largest])
+        largest = right;
+    this->operations.comp();
+
+    if (largest != i) {
+        this->operations.comp();
+        this->swap(data[i], data[largest]);
+        this->operations.swap();
+        heapify(n, largest);
+    }
+}
+
+void Visualizer::heap()
+{
+    for (int i = data.size() / 2 - 1; i >= 0; i--)
+        heapify(data.size(), i);
+
+    for (int i = data.size() - 1; i > 0; i--) {
+        this->swap(data[0], data[i]);
+        this->operations.swap();
+        heapify(i, 0);
+    }
+}
+
 void Visualizer::main_loop()
 {
     std::vector<data_t> copy;
@@ -248,6 +308,13 @@ void Visualizer::main_loop()
                             this->merge(0, this->samples - 1);
                             finish_highlight();
                             break;
+                        case sf::Keyboard::G: 
+                            this->operations.full_reset();
+                            copy = this->data;
+                            this->operations = heap_counter(copy);
+                            this->heap(); 
+                            finish_highlight(); 
+                            break;
                         case sf::Keyboard::R: this->generate_data(); break;
                         case sf::Keyboard::T: 
                             for (int i = 0; i < 4; i++) {
@@ -272,6 +339,40 @@ void Visualizer::main_loop()
                     break;
                 default:
                     break;
+            }
+        }
+        for (int i = 0; i <= COUNT; i++) {
+            if (menu.sort_buttons[i]->is_pressed()) {
+                switch (i)
+                {
+                case 0: this->bubble(); break;
+                case 1: this->selection(); break;
+                case 2: this->insertion(); break;
+                case 3:
+                    this->operations.full_reset();
+                    copy = this->data;
+                    merge_counter(copy, this->operations, 0, this->samples - 1);
+                    this->operations.combine();
+                    this->merge(0, this->samples - 1);
+                    break;
+                case 4: 
+                    this->operations.full_reset();
+                    copy = this->data;
+                    this->operations = heap_counter(copy);
+                    this->heap();
+                }
+                this->finish_highlight();
+                menu.sort_buttons[i]->change_state(idle);
+            }
+            if (menu.reset_button->is_pressed()) {
+                while (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {}
+                menu.reset_button->change_state(idle);
+                this->generate_data();
+            }
+            if (menu.shuffle_button->is_pressed()) {
+                while (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {}
+                menu.shuffle_button->change_state(idle);
+                this->shuffle_data();
             }
         }
         this->visualize_data();

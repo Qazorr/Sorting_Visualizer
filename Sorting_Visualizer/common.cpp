@@ -1,5 +1,19 @@
 #include "common.h"
 
+std::string get_name(int sort)
+{
+	switch (sort)
+	{
+		case bubble: return "BUBBLE";
+		case selection: return "SELECTION";
+		case insertion: return "INSERTION";
+		case merge: return "MERGE";
+		case heap: return "HEAP";
+		default: return "EMPTY";
+	}
+	return "EMPTY";
+}
+
 void swap(data_t& a, data_t& b)
 {	
 	data_t temp = a;
@@ -39,7 +53,6 @@ counter& selection_counter(std::vector<data_t> data)
 
 		min_value = data[i + 1].value;
 	}
-	std::cout << operations << "|" << operations.expected << std::endl;
 	return operations;
 }
 
@@ -88,6 +101,40 @@ void merge_counter(std::vector<data_t> &v, counter &operations, int start, int e
 	inplacemerge_counter(v, operations, start, end);
 }
 
+void heapify_counter(std::vector<data_t>& data, counter& ops, int n, int i)
+{
+	int largest = i, left = 2 * i + 1, right = 2 * i + 2;
+
+	if (left < n && data[left] > data[largest])
+		largest = left;
+	ops.comp();
+
+	if (right < n && data[right] > data[largest])
+		largest = right;
+	ops.comp();
+
+	if (largest != i) {
+		ops.comp();
+		std::swap(data[i], data[largest]);
+		ops.swap();
+		heapify_counter(data, ops, n, largest);
+	}
+}
+
+counter& heap_counter(std::vector<data_t>& data)
+{
+	counter operations;
+	for (int i = data.size() / 2 - 1; i >= 0; i--)
+		heapify_counter(data, operations, data.size(), i);
+
+	for (int i = data.size() - 1; i > 0; i--) {
+		std::swap(data[0], data[i]);
+		operations.swap();
+		heapify_counter(data, operations, i, 0);
+	}
+	return operations;
+}
+
 void show_progress(counter &operations)
 {
 	int progress = int(std::ceil(
@@ -96,12 +143,13 @@ void show_progress(counter &operations)
 	if (progress == 100 && !finished) progress--;
 	int spaces_num = 100 - progress;
 	char end = (finished) ? '\n' : '\r';
-	std::cout << "PROGRESS: [";
+	std::cout << "PROGRESS: [\033[1;35m";
 	for (int i = 0; i < progress; i++) {
 		std::cout << "=";
 	}
+	std::cout << "\033[0m";
 	while (spaces_num--) {
 		std::cout << " ";
 	}
-	std::cout << progress << "%]" << end;
+	std::cout << "\033[1;32m" << progress << "%\033[0m]" << end;
 }
